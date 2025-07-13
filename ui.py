@@ -223,18 +223,38 @@ class PrivateGptUi:
             theme=gr.themes.Soft(primary_hue=slate),
             css=f"""
                 #toggle-btn {{
-                    position: absolute; left: 20px; top: 35px; background: none; border: none; font-size: 28px; color: white; cursor: pointer; z-index: 10;
+                    position: absolute; 
+                    left: 20px; 
+                    top: 35px; 
+                    background: none; 
+                    border: none; 
+                    font-size: 28px; 
+                    color: white; 
+                    cursor: pointer; 
+                    z-index: 10;
                 }}
                 .header-bar {{
-                    position: relative; width: 100%; height: 100px;
-                    background-color: #0056A2; /* SBI Indigo */
+                    position: relative; 
+                    width: 100%; 
+                    height: 100px;
+                    background-color: #0056A2;
                     background-image: url("data:image/png;base64,{logo_data}");
                     background-repeat: no-repeat;
                     background-position: center;
                     background-size: contain;
                 }}
+                #sidebar {{
+                    transition: all 0.3s ease;
+                }}
+                .input-area {{
+                    margin-bottom: 0;
+                }}
+                .chatbot {{
+                    min-height: 400px;
+                }}
             """
         ) as blocks:
+            # JavaScript for toggle functionality
             blocks.load(None, None, js="""
                 () => {
                     const btn = document.getElementById('toggle-btn');
@@ -246,6 +266,7 @@ class PrivateGptUi:
                 }
             """)
 
+            # Header with toggle button
             with gr.Row():
                 gr.HTML(f"""
                     <div class='header-bar'>
@@ -253,12 +274,30 @@ class PrivateGptUi:
                     </div>
                 """)
 
+            # Main content area
             with gr.Row():
+                # Sidebar column
                 with gr.Column(scale=3, elem_id="sidebar"):
-                    mode = gr.Radio([m.value for m in MODES], label="Mode", value=self._default_mode)
-                    explanation = gr.Textbox(placeholder=self._get_default_mode_explanation(self._default_mode), interactive=False)
-                    upload_btn = gr.UploadButton("Upload File(s)", type="filepath", file_count="multiple")
-                    files_list = gr.List(self._list_ingested_files, headers=["File name"], label="Ingested Files", height=235)
+                    mode = gr.Radio(
+                        [m.value for m in MODES], 
+                        label="Mode", 
+                        value=self._default_mode
+                    )
+                    explanation = gr.Textbox(
+                        placeholder=self._get_default_mode_explanation(self._default_mode), 
+                        interactive=False
+                    )
+                    upload_btn = gr.UploadButton(
+                        "Upload File(s)", 
+                        type="filepath", 
+                        file_count="multiple"
+                    )
+                    files_list = gr.List(
+                        self._list_ingested_files, 
+                        headers=["File name"], 
+                        label="Ingested Files", 
+                        height=235
+                    )
                     upload_btn.upload(self._upload_file, upload_btn, files_list)
                     deselect = gr.Button("Deselect", interactive=False)
                     selected = gr.Textbox("All files", label="Selected for Query or Deletion")
@@ -272,17 +311,44 @@ class PrivateGptUi:
                     mode.change(self._set_current_mode, mode, [sys_prompt, explanation])
                     sys_prompt.blur(self._set_system_prompt, sys_prompt)
 
+                # Chat interface column
                 with gr.Column(scale=7):
-                    gr.ChatInterface(
-                        self._chat,
-                        chatbot=gr.Chatbot(label="SBI GPT", avatar_images=(None, AVATAR_BOT)),
-                        additional_inputs=[mode, upload_btn, sys_prompt]
+                    chatbot = gr.Chatbot(
+                        label="SBI GPT", 
+                        avatar_images=(None, AVATAR_BOT),
+                        height=600
                     )
-            gr.HTML("<footer style='text-align:center; margin-top: 20px;'>Maintained by Meghdoot</footer>")
+                    msg = gr.Textbox(
+                        placeholder="Type a message...",
+                        show_label=False,
+                        container=False
+                    )
+                    with gr.Row():
+                        clear = gr.Button("Clear")
+                        submit = gr.Button("Submit", variant="primary")
+                    
+                    # Chat functionality
+                    msg.submit(
+                        lambda msg, history, mode: self._chat(msg, history, mode),
+                        [msg, chatbot, mode],
+                        [chatbot],
+                        queue=False
+                    ).then(lambda: "", None, [msg])
+                    
+                    submit.click(
+                        lambda msg, history, mode: self._chat(msg, history, mode),
+                        [msg, chatbot, mode],
+                        [chatbot],
+                        queue=False
+                    ).then(lambda: "", None, [msg])
+                    
+                    clear.click(lambda: None, None, [chatbot], queue=False)
+        
         return blocks
 
     def get_ui_blocks(self):
-        if not self._ui_block: self._ui_block = self._build_ui_blocks()
+        if not self._ui_block: 
+            self._ui_block = self._build_ui_blocks()
         return self._ui_block
 
     def mount_in_app(self, app: FastAPI, path: str):
@@ -296,4 +362,3 @@ if __name__ == "__main__":
     _blocks = ui.get_ui_blocks()
     _blocks.queue()
     _blocks.launch(debug=False, show_api=False)
-
